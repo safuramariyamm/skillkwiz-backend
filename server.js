@@ -105,7 +105,7 @@ app.get('/debug', (req, res) => {
       methods: Object.keys(layer.route?.methods || {})
     }))
   });
-}); '
+});
 
 // 404 Handler
 app.use((req, res) => {
