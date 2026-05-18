@@ -23,13 +23,13 @@ const contactRoutes = require("./routes/contact.routes");
 const otpRoutes = require("./routes/otp.routes");
 const examBookingRoutes = require("./routes/examBooking.routes");
 
-// CREATE app AFTER all imports
-const app = express();  // <-- Make sure this line exists!
+// CREATE APP
+const app = express();
 
-// ─── Connect to MongoDB ─────────────────────────────────────────
+// Connect to MongoDB
 connectDB();
 
-// ─── Security Middleware ───────────────────────────────────────
+// Security Middleware
 app.use(helmet());
 
 // Rate limiter
@@ -43,13 +43,13 @@ const limiter = rateLimit({
 app.use("/api/", limiter);
 
 // Auth-specific stricter rate limit
-const authLimiter = rateLimit({  // <-- Make sure this is defined BEFORE using it
+const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
   message: { success: false, message: "Too many authentication attempts. Please try again later." },
 });
 
-// ─── CORS ───────────────────────────────────────────────────────
+// CORS
 app.use(
   cors({
     origin: process.env.CLIENT_URL || "http://localhost:3000",
@@ -59,19 +59,19 @@ app.use(
   })
 );
 
-// ─── Body Parsers ───────────────────────────────────────────────
+// Body Parsers
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// ─── Logging ────────────────────────────────────────────────────
+// Logging
 if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
 }
 
-// ─── Static Files ───────────────────────────────────────────────
+// Static Files
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// ─── Health Check ───────────────────────────────────────────────
+// Health Check
 app.get("/health", (req, res) => {
   res.status(200).json({
     success: true,
@@ -81,8 +81,8 @@ app.get("/health", (req, res) => {
   });
 });
 
-// ─── API Routes ─────────────────────────────────────────────────
-app.use("/api/auth", authLimiter, authRoutes);  // Fixed spelling!
+// API Routes
+app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/candidates", candidateRoutes);
 app.use("/api/employers", employerRoutes);
@@ -94,15 +94,15 @@ app.use("/api/contact", contactRoutes);
 app.use("/api/otp", otpRoutes);
 app.use("/api/exam-bookings", examBookingRoutes);
 
-// ─── 404 Handler ────────────────────────────────────────────────
+// 404 Handler
 app.use((req, res) => {
   res.status(404).json({ success: false, message: `Route ${req.originalUrl} not found` });
 });
 
-// ─── Global Error Handler ───────────────────────────────────────
+// Global Error Handler
 app.use(errorHandler);
 
-// ─── Start Server ───────────────────────────────────────────────
+// Start Server
 const PORT = process.env.PORT || 5000;
 const server = app.listen(PORT, () => {
   console.log(`\n🚀 SkillKwiz API running on port ${PORT} in ${process.env.NODE_ENV} mode`);
