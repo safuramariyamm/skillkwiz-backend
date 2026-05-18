@@ -10,6 +10,30 @@ require("dotenv").config();
 const connectDB = require("./config/db");
 const errorHandler = require("./middleware/errorHandler");
 
+// Add this after connecting to MongoDB
+console.log('Starting route registration...');
+
+// Log all registered routes after setting them up
+const logRoutes = () => {
+  console.log('\n--- REGISTERED ROUTES ---');
+  app._router.stack.forEach(layer => {
+    if (layer.route) {
+      console.log(`${Object.keys(layer.route.methods)} ${layer.route.path}`);
+    } else if (layer.name === 'router') {
+      console.log(`Router: ${layer.regexp}`);
+    }
+  });
+  console.log('-------------------------\n');
+};
+
+// Your existing route registrations...
+app.use("/api/auth", authLimiter, authRoutes);
+app.use("/api/users", userRoutes);
+// ... etc
+
+// Call this after all routes are registered
+logRoutes();
+
 // Route imports
 const authRoutes = require("./routes/auth.routes");
 const userRoutes = require("./routes/user.routes");
@@ -108,6 +132,62 @@ app.use("/api/otp", otpRoutes);
 app.use("/api/exam-bookings", examBookingRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────────
+
+// Test endpoint to check if route files are loaded
+// ─── Debug Routes - Add this BEFORE the 404 handler ─────────────
+app.get('/debug/ls', (req, res) => {
+  const fs = require('fs');
+  const path = require('path');
+
+  const listFiles = (dir) => {
+    try {
+      return fs.readdirSync(dir);
+    } catch (e) {
+      return [`Cannot read ${dir}: ${e.message}`];
+    }
+  };
+
+  res.json({
+    success: true,
+    currentDir: listFiles('.'),
+    routesDir: listFiles('./routes'),
+    modelsDir: listFiles('./models'),
+    controllersDir: listFiles('./controllers')
+  });
+});
+
+// Also add this to see registered routes
+app.get('/debug/routes', (req, res) => {
+  const routes = [];
+
+  const extractRoutes = (stack, basePath = '') => {
+    stack.forEach(layer => {
+      if (layer.route) {
+        // Express 4.x route
+        const methods = Object.keys(layer.route.methods).join(', ');
+        routes.push(`${methods.toUpperCase()} ${basePath}${layer.route.path}`);
+      } else if (layer.name === 'router' && layer.handle.stack) {
+        // Nested router
+        const routerPath = layer.regexp.source
+          .replace('\\/?(?=\\/|$)', '')
+          .replace(/\\\//g, '/')
+          .replace(/\^/, '')
+          .replace(/\?.*$/, '');
+        extractRoutes(layer.handle.stack, basePath + routerPath);
+      }
+    });
+  };
+
+  extractRoutes(app._router.stack);
+
+  res.json({
+    success: true,
+    totalRoutes: routes.length,
+    routes: routes.sort()
+  });
+});
+
+
 app.use((req, res) => {
   res.status(404).json({ success: false, message: `Route ${req.originalUrl} not found` });
 });
