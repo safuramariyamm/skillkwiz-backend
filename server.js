@@ -92,7 +92,20 @@ app.use("/api/blogs", blogRoutes);
 app.use("/api/uploads", uploadRoutes);
 app.use("/api/contact", contactRoutes);
 app.use("/api/otp", otpRoutes);
-app.use("/api/exam-bookings", examBookingRoutes);
+app.use("/api/exam-bookings", examBookingRoutes); '
+
+
+// Add this before the 404 handler
+app.get('/debug', (req, res) => {
+  res.json({
+    success: true,
+    message: "Debug endpoint working",
+    routes: app._router.stack.filter(layer => layer.route).map(layer => ({
+      path: layer.route?.path,
+      methods: Object.keys(layer.route?.methods || {})
+    }))
+  });
+}); '
 
 // 404 Handler
 app.use((req, res) => {
