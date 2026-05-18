@@ -92,7 +92,7 @@ app.use("/api/blogs", blogRoutes);
 app.use("/api/uploads", uploadRoutes);
 app.use("/api/contact", contactRoutes);
 app.use("/api/otp", otpRoutes);
-app.use("/api/exam-bookings", examBookingRoutes); '
+app.use("/api/exam-bookings", examBookingRoutes);
 
 
 // Add this before the 404 handler
