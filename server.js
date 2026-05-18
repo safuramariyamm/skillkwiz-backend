@@ -23,16 +23,14 @@ const contactRoutes = require("./routes/contact.routes");
 const otpRoutes = require("./routes/otp.routes");
 const examBookingRoutes = require("./routes/examBooking.routes");
 
-// CREATE APP
 const app = express();
 
-// Connect to MongoDB
+// ─── Connect to MongoDB ────────────────────────────────────────────────────────
 connectDB();
 
-// Security Middleware
+// ─── Security Middleware ───────────────────────────────────────────────────────
 app.use(helmet());
 
-// Rate limiter
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
   max: parseInt(process.env.RATE_LIMIT_MAX) || 100,
@@ -49,7 +47,7 @@ const authLimiter = rateLimit({
   message: { success: false, message: "Too many authentication attempts. Please try again later." },
 });
 
-// CORS
+// ─── CORS ─────────────────────────────────────────────────────────────────────
 app.use(
   cors({
     origin: process.env.CLIENT_URL || "http://localhost:3000",
@@ -59,19 +57,19 @@ app.use(
   })
 );
 
-// Body Parsers
+// ─── Body Parsers ─────────────────────────────────────────────────────────────
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// Logging
+// ─── Logging ──────────────────────────────────────────────────────────────────
 if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
 }
 
-// Static Files
+// ─── Static Files (uploaded resumes) ─────────────────────────────────────────
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// Health Check
+// ─── Health Check ─────────────────────────────────────────────────────────────
 app.get("/health", (req, res) => {
   res.status(200).json({
     success: true,
@@ -81,7 +79,7 @@ app.get("/health", (req, res) => {
   });
 });
 
-// API Routes
+// ─── API Routes ───────────────────────────────────────────────────────────────
 app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/candidates", candidateRoutes);
@@ -94,28 +92,15 @@ app.use("/api/contact", contactRoutes);
 app.use("/api/otp", otpRoutes);
 app.use("/api/exam-bookings", examBookingRoutes);
 
-
-// Add this before the 404 handler
-app.get('/debug', (req, res) => {
-  res.json({
-    success: true,
-    message: "Debug endpoint working",
-    routes: app._router.stack.filter(layer => layer.route).map(layer => ({
-      path: layer.route?.path,
-      methods: Object.keys(layer.route?.methods || {})
-    }))
-  });
-});
-
-// 404 Handler
+// ─── 404 Handler ──────────────────────────────────────────────────────────────
 app.use((req, res) => {
   res.status(404).json({ success: false, message: `Route ${req.originalUrl} not found` });
 });
 
-// Global Error Handler
+// ─── Global Error Handler ─────────────────────────────────────────────────────
 app.use(errorHandler);
 
-// Start Server
+// ─── Start Server ─────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 const server = app.listen(PORT, () => {
   console.log(`\n🚀 SkillKwiz API running on port ${PORT} in ${process.env.NODE_ENV} mode`);
