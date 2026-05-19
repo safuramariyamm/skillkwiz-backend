@@ -87,7 +87,6 @@ blogSchema.pre("save", function (next) {
   next();
 });
 
-blogSchema.index({ slug: 1 });
 blogSchema.index({ status: 1, publishedAt: -1 });
 blogSchema.index({ category: 1 });
 blogSchema.index({ featured: 1 });

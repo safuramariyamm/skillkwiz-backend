@@ -1,38 +1,161 @@
 const express = require("express");
-const passport = require("passport");
-const router = express.Router();
-require("../config/passport");
+const mongoose = require("mongoose");
+const cors = require("cors");
+const helmet = require("helmet");
+const morgan = require("morgan");
+const rateLimit = require("express-rate-limit");
+const path = require("path");
+require("dotenv").config();
 
-const { register, login, refreshToken, getMe, logout, googleCallback, changePassword } = require("../controllers/auth.controller");
-const { protect } = require("../middleware/auth.middleware");
-const { registerValidator, loginValidator } = require("../middleware/validate.middleware");
+const connectDB = require("./config/db");
+const errorHandler = require("./middleware/errorHandler");
 
-// POST /api/auth/register
-router.post("/register", registerValidator, register);
+const authRoutes = require("./routes/auth.routes");
+const userRoutes = require("./routes/user.routes");
+const candidateRoutes = require("./routes/candidate.routes");
+const employerRoutes = require("./routes/employer.routes");
+const assessmentRoutes = require("./routes/assessment.routes");
+const skillRoutes = require("./routes/skill.routes");
+const blogRoutes = require("./routes/blog.routes");
+const uploadRoutes = require("./routes/upload.routes");
+const contactRoutes = require("./routes/contact.routes");
+const otpRoutes = require("./routes/otp.routes");
+const examBookingRoutes = require("./routes/examBooking.routes");
 
-// POST /api/auth/login
-router.post("/login", loginValidator, login);
+const app = express();
 
-// POST /api/auth/refresh-token
-router.post("/refresh-token", refreshToken);
+connectDB();
 
-// GET /api/auth/me
-router.get("/me", protect, getMe);
+// ─── CORS — must come before helmet and all routes ───────────────────────────
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow no-origin requests (Postman, mobile apps, server-to-server)
+    if (!origin) return callback(null, true);
 
-// POST /api/auth/logout
-router.post("/logout", protect, logout);
+    const allowed = [
+      "http://localhost:3000",
+      "http://localhost:3001",
+    ];
 
-// PUT /api/auth/change-password
-router.put("/change-password", protect, changePassword);
+    // Add any explicitly configured URLs from env
+    if (process.env.CLIENT_URL) allowed.push(process.env.CLIENT_URL);
+    if (process.env.CLIENT_URL_PROD) allowed.push(process.env.CLIENT_URL_PROD);
 
-// GET /api/auth/google
-router.get("/google", passport.authenticate("google", { scope: ["profile", "email"], session: false }));
+    // Allow ALL vercel.app and railway.app subdomains (covers preview + production)
+    if (
+      allowed.includes(origin) ||
+      /\.vercel\.app$/.test(origin) ||
+      /\.railway\.app$/.test(origin) ||
+      /\.up\.railway\.app$/.test(origin)
+    ) {
+      return callback(null, true);
+    }
 
-// GET /api/auth/google/callback
-router.get(
-  "/google/callback",
-  passport.authenticate("google", { session: false, failureRedirect: `${process.env.CLIENT_URL}/login?error=google_auth_failed` }),
-  googleCallback
-);
+    console.warn(`[CORS] Blocked: ${origin}`);
+    callback(new Error(`CORS: ${origin} not allowed`), false);
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+  optionsSuccessStatus: 200,
+};
 
-module.exports = router;
+// Handle ALL preflight requests first
+app.options("*", cors(corsOptions));
+app.use(cors(corsOptions));
+
+// ─── Security ─────────────────────────────────────────────────────────────────
+app.use(helmet({ crossOriginResourcePolicy: false }));
+
+// ─── Rate limiting ────────────────────────────────────────────────────────────
+const limiter = rateLimit({
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
+  max: parseInt(process.env.RATE_LIMIT_MAX) || 200,
+  message: { success: false, message: "Too many requests. Please try again later." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use("/api/", limiter);
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  message: { success: false, message: "Too many auth attempts. Please try again later." },
+});
+
+// ─── Body parsers ─────────────────────────────────────────────────────────────
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// ─── Logging ──────────────────────────────────────────────────────────────────
+app.use(morgan(process.env.NODE_ENV === "development" ? "dev" : "combined"));
+
+// ─── Static files ─────────────────────────────────────────────────────────────
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+// ─── Root + Health ────────────────────────────────────────────────────────────
+app.get("/", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "SkillKwiz API is running",
+    version: "1.0.0",
+    environment: process.env.NODE_ENV,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "SkillKwiz API is healthy",
+    environment: process.env.NODE_ENV,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.get("/api", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "SkillKwiz API v1",
+    endpoints: [
+      "/api/auth", "/api/users", "/api/candidates",
+      "/api/employers", "/api/assessments", "/api/otp",
+      "/api/blogs", "/api/contact", "/api/skills",
+    ],
+  });
+});
+
+// ─── API Routes ───────────────────────────────────────────────────────────────
+app.use("/api/auth", authLimiter, authRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/candidates", candidateRoutes);
+app.use("/api/employers", employerRoutes);
+app.use("/api/assessments", assessmentRoutes);
+app.use("/api/skills", skillRoutes);
+app.use("/api/blogs", blogRoutes);
+app.use("/api/uploads", uploadRoutes);
+app.use("/api/contact", contactRoutes);
+app.use("/api/otp", otpRoutes);
+app.use("/api/exam-bookings", examBookingRoutes);
+
+// ─── 404 ──────────────────────────────────────────────────────────────────────
+app.use((req, res) => {
+  res.status(404).json({ success: false, message: `Route ${req.originalUrl} not found` });
+});
+
+// ─── Error handler ────────────────────────────────────────────────────────────
+app.use(errorHandler);
+
+// ─── Start ────────────────────────────────────────────────────────────────────
+const PORT = process.env.PORT || 5000;
+const server = app.listen(PORT, "0.0.0.0", () => {
+  console.log(`\n🚀 SkillKwiz API running on port ${PORT} in ${process.env.NODE_ENV} mode`);
+  console.log(`📋 Health: http://localhost:${PORT}/health\n`);
+});
+
+process.on("unhandledRejection", (err) => {
+  console.error("UNHANDLED REJECTION:", err.message);
+  server.close(() => process.exit(1));
+});
+
+module.exports = app;

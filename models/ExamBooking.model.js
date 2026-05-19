@@ -98,7 +98,6 @@ examBookingSchema.virtual("formattedTime").get(function () {
 // Indexes for efficient queries
 examBookingSchema.index({ employee: 1, status: 1 });
 examBookingSchema.index({ user: 1, scheduledDate: -1 });
-examBookingSchema.index({ bookingReference: 1 });
 examBookingSchema.index({ scheduledDate: 1 });
 
 module.exports = mongoose.model("ExamBooking", examBookingSchema);

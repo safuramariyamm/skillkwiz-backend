@@ -40,7 +40,6 @@ const skillSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-skillSchema.index({ name: 1 });
 skillSchema.index({ category: 1 });
 
 // ─── OTP ─────────────────────────────────────────────────────────────────────
